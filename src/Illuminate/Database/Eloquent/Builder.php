@@ -445,7 +445,9 @@ class Builder
         // If the model has a mutator for the requested column, we will spin through
         // the results and mutate the values so that the mutated version of these
         // columns are returned as you would expect from these Eloquent models.
-        if (! $this->model->hasGetMutator($column)) {
+        if (! $this->model->hasGetMutator($column) &&
+            ! $this->model->hasCast($column) &&
+            ! in_array($column, $this->model->getDates())) {
             return $results;
         }
 
@@ -471,12 +473,12 @@ class Builder
 
         $total = $query->getCountForPagination();
 
-        $this->forPage(
+        $results = $total ? $this->forPage(
             $page = $page ?: Paginator::resolveCurrentPage($pageName),
             $perPage = $perPage ?: $this->model->getPerPage()
-        );
+        )->get($columns) : [];
 
-        return new LengthAwarePaginator($this->get($columns), $total, $perPage, $page, [
+        return new LengthAwarePaginator($results, $total, $perPage, $page, [
             'path' => Paginator::resolveCurrentPath(),
             'pageName' => $pageName,
         ]);
@@ -695,7 +697,7 @@ class Builder
      * @param  string  $relation
      * @return array
      */
-    public function nestedRelations($relation)
+    protected function nestedRelations($relation)
     {
         $nested = [];
 
@@ -1017,6 +1019,23 @@ class Builder
     }
 
     /**
+     * Prevent the specified relations from being eager loaded.
+     *
+     * @param  mixed  $relations
+     * @return $this
+     */
+    public function without($relations)
+    {
+        if (is_string($relations)) {
+            $relations = func_get_args();
+        }
+
+        $this->eagerLoad = array_diff_key($this->eagerLoad, array_flip($relations));
+
+        return $this;
+    }
+
+    /**
      * Add subselect queries to count the relations.
      *
      * @param  mixed  $relations
@@ -1108,6 +1127,29 @@ class Builder
         }
 
         return $results;
+    }
+
+    /**
+     * Add the given scopes to the current builder instance.
+     *
+     * @param  array  $scopes
+     * @return mixed
+     */
+    public function scopes(array $scopes)
+    {
+        $builder = $this;
+
+        foreach ($scopes as $scope => $parameters) {
+            if (is_int($scope)) {
+                list($scope, $parameters) = [$parameters, []];
+            }
+
+            $builder = $builder->callScope(
+                [$this->model, 'scope'.ucfirst($scope)], (array) $parameters
+            );
+        }
+
+        return $builder;
     }
 
     /**

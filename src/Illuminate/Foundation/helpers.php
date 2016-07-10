@@ -138,7 +138,7 @@ if (! function_exists('auth')) {
      * Get the available auth instance.
      *
      * @param  string|null  $guard
-     * @return \Illuminate\Contracts\Auth\Factory
+     * @return \Illuminate\Contracts\Auth\Factory|\Illuminate\Contracts\Auth\Guard|\Illuminate\Contracts\Auth\StatefulGuard
      */
     function auth($guard = null)
     {
@@ -188,6 +188,39 @@ if (! function_exists('bcrypt')) {
     function bcrypt($value, $options = [])
     {
         return app('hash')->make($value, $options);
+    }
+}
+
+if (! function_exists('cache')) {
+    /**
+     * Get / set the specified cache value.
+     *
+     * If an array is passed, we'll assume you want to put to the cache.
+     *
+     * @param  dynamic  key|key,default|data,expiration|null
+     * @return mixed
+     */
+    function cache()
+    {
+        $arguments = func_get_args();
+
+        if (empty($arguments)) {
+            return app('cache');
+        }
+
+        if (is_string($arguments[0])) {
+            return app('cache')->get($arguments[0], isset($arguments[1]) ? $arguments[1] : null);
+        }
+
+        if (is_array($arguments[0])) {
+            if (! isset($arguments[1])) {
+                throw new Exception(
+                    'You must set an expiration time when putting to the cache.'
+                );
+            }
+
+            return app('cache')->put(key($arguments[0]), reset($arguments[0]), $arguments[1]);
+        }
     }
 }
 

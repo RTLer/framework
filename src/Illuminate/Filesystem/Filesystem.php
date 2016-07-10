@@ -187,6 +187,24 @@ class Filesystem
     }
 
     /**
+     * Create a hard link to the target file or directory.
+     *
+     * @param  string  $target
+     * @param  string  $link
+     * @return void
+     */
+    public function link($target, $link)
+    {
+        if (! windows_os()) {
+            return symlink($target, $link);
+        }
+
+        $mode = $this->isDirectory($target) ? 'J' : 'H';
+
+        exec("mklink /{$mode} \"{$link}\" \"{$target}\"");
+    }
+
+    /**
      * Extract the file name from a file path.
      *
      * @param  string  $path
@@ -386,6 +404,29 @@ class Filesystem
         }
 
         return mkdir($path, $mode, $recursive);
+    }
+
+    /**
+     * Move a directory.
+     *
+     * @param  string  $from
+     * @param  string  $to
+     * @param  bool  $overwrite
+     * @return bool
+     */
+    public function moveDirectory($from, $to, $overwrite = false)
+    {
+        if ($overwrite && $this->isDirectory($to)) {
+            $this->deleteDirectory($to);
+
+            $this->copyDirectory($from, $to);
+
+            $this->deleteDirectory($from);
+
+            return true;
+        }
+
+        return @rename($from, $to) === true;
     }
 
     /**

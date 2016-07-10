@@ -72,6 +72,15 @@ class Router implements RegistrarContract
     protected $middlewareGroups = [];
 
     /**
+     * The priority-sorted list of middleware.
+     *
+     * Forces the listed middleware to always be in the given order.
+     *
+     * @var array
+     */
+    public $middlewarePriority = [];
+
+    /**
      * The registered route value binders.
      *
      * @var array
@@ -583,9 +592,7 @@ class Router implements RegistrarContract
     {
         $this->currentRequest = $request;
 
-        $response = $this->dispatchToRoute($request);
-
-        return $this->prepareResponse($request, $response);
+        return $this->dispatchToRoute($request);
     }
 
     /**
@@ -624,15 +631,14 @@ class Router implements RegistrarContract
         $shouldSkipMiddleware = $this->container->bound('middleware.disable') &&
                                 $this->container->make('middleware.disable') === true;
 
-        $middleware = $shouldSkipMiddleware ? [] : $this->gatherRouteMiddlewares($route);
+        $middleware = $shouldSkipMiddleware ? [] : $this->gatherRouteMiddleware($route);
 
         return (new Pipeline($this->container))
                         ->send($request)
                         ->through($middleware)
                         ->then(function ($request) use ($route) {
                             return $this->prepareResponse(
-                                $request,
-                                $route->run($request)
+                                $request, $route->run($request)
                             );
                         });
     }
@@ -643,12 +649,13 @@ class Router implements RegistrarContract
      * @param  \Illuminate\Routing\Route  $route
      * @return array
      */
-    public function gatherRouteMiddlewares(Route $route)
+    public function gatherRouteMiddleware(Route $route)
     {
-        return Collection::make($route->middleware())->map(function ($name) {
-            return Collection::make($this->resolveMiddlewareClassName($name));
-        })
-        ->flatten()->all();
+        $middleware = collect($route->gatherMiddleware())->map(function ($name) {
+            return (array) $this->resolveMiddlewareClassName($name);
+        })->flatten();
+
+        return $this->sortMiddleware($middleware)->all();
     }
 
     /**
@@ -719,6 +726,38 @@ class Router implements RegistrarContract
         }
 
         return $results;
+    }
+
+    /**
+     * Sort the given middleware by priority.
+     *
+     * @param  \Illuminate\Support\Collection  $middlewares
+     * @return \Illuminate\Support\Collection
+     */
+    protected function sortMiddleware(Collection $middlewares)
+    {
+        $priority = collect($this->middlewarePriority);
+
+        $sorted = collect();
+
+        foreach ($middlewares as $middleware) {
+            if ($sorted->contains($middleware)) {
+                continue;
+            }
+
+            if (($index = $priority->search($middleware)) !== false) {
+                $sorted = $sorted->merge(
+                    $priority->take($index)->filter(function ($middleware) use ($middlewares, $sorted) {
+                        return $middlewares->contains($middleware) &&
+                             ! $sorted->contains($middleware);
+                    })
+                );
+            }
+
+            $sorted[] = $middleware;
+        }
+
+        return $sorted;
     }
 
     /**

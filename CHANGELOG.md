@@ -1,5 +1,49 @@
 # Release Notes
 
+## v5.2.39 (2016-06-17)
+
+### Added
+- Added `without()` method to Eloquent query builder ([#14031](https://github.com/laravel/framework/pull/14031))
+- Added `keyType` property Eloquent models to set key type cast ([#13985](https://github.com/laravel/framework/pull/13985))
+- Added support for mail transport `StreamOptions` ([#13925](https://github.com/laravel/framework/pull/13925))
+- Added `validationData()` method to `FormRequest` ([#13914](https://github.com/laravel/framework/pull/13914))
+
+### Changed
+- Only `set names` for MySQL connections if `charset` is set in config ([#13930](https://github.com/laravel/framework/pull/13930))
+- Support recursive container alias resolution ([#13976](https://github.com/laravel/framework/pull/13976))
+- Use late static binding in `PasswordBroker` ([#13975](https://github.com/laravel/framework/pull/13975))
+- Make sure Ajax requests are not Pjax requests in `FormRequest` ([#14024](https://github.com/laravel/framework/pull/14024))
+- Set existence state of expired database sessions, instead of deleting them ([53c0440](https://github.com/laravel/framework/commit/53c04406baa5f63bbb41127f40afee0a0facadd1))
+- Release Beanstalkd jobs before burying them ([#13963](https://github.com/laravel/framework/pull/13963))
+
+### Fixed
+- Use `getIncrementing()` method instead of the `$incrementing` attribute ([#14005](https://github.com/laravel/framework/pull/14005))
+- Fixed fatal error when `services.json` is empty ([#14030](https://github.com/laravel/framework/pull/14030))
+
+
+## v5.2.38 (2016-06-13)
+
+### Changed
+- Convert multiple `Model::fresh()` arguments to array before passing to `with()` ([#13950](https://github.com/laravel/framework/pull/13950))
+- Iterate only through files that contain a namespace in `app:name` command. ([#13961](https://github.com/laravel/framework/pull/13961))
+
+### Fixed
+- Close swift mailer connection after sending mail ([#13583](https://github.com/laravel/framework/pull/13583))
+- Prevent possible key overlap in `Str::snake` cache ([#13943](https://github.com/laravel/framework/pull/13943))
+- Fixed issue when eager loading chained `MorphTo` relationships ([#13967](https://github.com/laravel/framework/pull/13967))
+- Delete database session record if it's expired ([09b09eb](https://github.com/laravel/framework/commit/09b09ebad480940f2b49f96bbfbea0647783025e))
+
+
+## v5.2.37 (2016-06-10)
+
+### Added
+- Added `hasArgument()` and `hasOption()` methods to `Command` class ([#13919](https://github.com/laravel/framework/pull/13919))
+- Added `$failedId` property to `JobFailed` event ([#13920](https://github.com/laravel/framework/pull/13920))
+
+### Fixed
+- Fixed session expiration on several drivers ([0831312](https://github.com/laravel/framework/commit/0831312aec47d904a65039e07574f41ab7492418))
+
+
 ## v5.2.36 (2016-06-06)
 
 ### Added

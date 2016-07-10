@@ -128,8 +128,10 @@ class ContainerContainerTest extends PHPUnit_Framework_TestCase
         $container = new Container;
         $container['foo'] = 'bar';
         $container->alias('foo', 'baz');
+        $container->alias('baz', 'bat');
         $this->assertEquals('bar', $container->make('foo'));
         $this->assertEquals('bar', $container->make('baz'));
+        $this->assertEquals('bar', $container->make('bat'));
         $container->bind(['bam' => 'boom'], function () {
             return 'pow';
         });
@@ -224,7 +226,10 @@ class ContainerContainerTest extends PHPUnit_Framework_TestCase
 
             return $obj;
         });
+
         $this->assertEquals('foo', $container->make('foo')->foo);
+        $this->assertEquals('baz', $container->make('foo')->bar);
+        $this->assertEquals('foo', $container->make('foo')->baz);
     }
 
     public function testExtendIsLazyInitialized()
