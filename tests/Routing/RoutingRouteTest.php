@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
 use Illuminate\Events\Dispatcher;
+use Illuminate\Routing\Controller;
 use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Auth\Middleware\Authorize;
@@ -98,6 +99,12 @@ class RoutingRouteTest extends PHPUnit_Framework_TestCase
         $this->assertFalse($router->is('bar'));
 
         $router = $this->getRouter();
+        $route = $router->get('foo/{file}', function ($file) {
+            return $file;
+        });
+        $this->assertEquals('oxygen%20', $router->dispatch(Request::create('http://test.com/foo/oxygen%2520', 'GET'))->getContent());
+
+        $router = $this->getRouter();
         $router->patch('foo/bar', ['as' => 'foo', function () {
             return 'bar';
         }]);
@@ -141,6 +148,18 @@ class RoutingRouteTest extends PHPUnit_Framework_TestCase
     public function testClosureMiddleware()
     {
         $router = $this->getRouter();
+        $middleware = function ($request, $next) {
+            return 'caught';
+        };
+        $router->get('foo/bar', ['middleware' => $middleware, function () {
+            return 'hello';
+        }]);
+        $this->assertEquals('caught', $router->dispatch(Request::create('foo/bar', 'GET'))->getContent());
+    }
+
+    public function testDefinedClosureMiddleware()
+    {
+        $router = $this->getRouter();
         $router->get('foo/bar', ['middleware' => 'foo', function () {
             return 'hello';
         }]);
@@ -148,6 +167,25 @@ class RoutingRouteTest extends PHPUnit_Framework_TestCase
             return 'caught';
         });
         $this->assertEquals('caught', $router->dispatch(Request::create('foo/bar', 'GET'))->getContent());
+    }
+
+    public function testControllerClosureMiddleware()
+    {
+        $router = $this->getRouter();
+        $router->get('foo/bar', [
+            'uses' => 'RouteTestClosureMiddlewareController@index',
+            'middleware' => 'foo',
+        ]);
+        $router->middleware('foo', function ($request, $next) {
+            $request['foo-middleware'] = 'foo-middleware';
+
+            return $next($request);
+        });
+
+        $this->assertEquals(
+            'index-foo-middleware-controller-closure',
+            $router->dispatch(Request::create('foo/bar', 'GET'))->getContent()
+        );
     }
 
     /**
@@ -602,7 +640,7 @@ class RoutingRouteTest extends PHPUnit_Framework_TestCase
     }
 
     /**
-     * @expectedException Symfony\Component\HttpKernel\Exception\NotFoundHttpException
+     * @expectedException Illuminate\Database\Eloquent\ModelNotFoundException
      */
     public function testModelBindingWithNullReturn()
     {
@@ -1123,7 +1161,7 @@ class RoutingRouteTest extends PHPUnit_Framework_TestCase
     }
 }
 
-class RouteTestControllerStub extends Illuminate\Routing\Controller
+class RouteTestControllerStub extends Controller
 {
     public function __construct()
     {
@@ -1139,7 +1177,7 @@ class RouteTestControllerStub extends Illuminate\Routing\Controller
     }
 }
 
-class RouteTestControllerMiddlewareGroupStub extends Illuminate\Routing\Controller
+class RouteTestControllerMiddlewareGroupStub extends Controller
 {
     public function __construct()
     {
@@ -1152,11 +1190,30 @@ class RouteTestControllerMiddlewareGroupStub extends Illuminate\Routing\Controll
     }
 }
 
-class RouteTestControllerWithParameterStub extends Illuminate\Routing\Controller
+class RouteTestControllerWithParameterStub extends Controller
 {
     public function returnParameter($bar = '')
     {
         return $bar;
+    }
+}
+
+class RouteTestClosureMiddlewareController extends Controller
+{
+    public function __construct()
+    {
+        $this->middleware(function ($request, $next) {
+            $response = $next($request);
+
+            return $response->setContent(
+                $response->content().'-'.$request['foo-middleware'].'-controller-closure'
+            );
+        });
+    }
+
+    public function index()
+    {
+        return 'index';
     }
 }
 

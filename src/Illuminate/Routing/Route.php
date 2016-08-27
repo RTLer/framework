@@ -171,7 +171,9 @@ class Route
             $this->parametersWithoutNulls(), new ReflectionFunction($this->action['uses'])
         );
 
-        return call_user_func_array($this->action['uses'], $parameters);
+        $callable = $this->action['uses'];
+
+        return $callable(...array_values($parameters));
     }
 
     /**
@@ -289,7 +291,7 @@ class Route
         }
 
         if (is_string($middleware)) {
-            $middleware = [$middleware];
+            $middleware = func_get_args();
         }
 
         $this->action['middleware'] = array_merge(
@@ -424,9 +426,7 @@ class Route
     public function parameters()
     {
         if (isset($this->parameters)) {
-            return array_map(function ($value) {
-                return is_string($value) ? rawurldecode($value) : $value;
-            }, $this->parameters);
+            return $this->parameters;
         }
 
         throw new LogicException('Route is not bound.');
@@ -820,7 +820,8 @@ class Route
      */
     public function domain()
     {
-        return isset($this->action['domain']) ? $this->action['domain'] : null;
+        return isset($this->action['domain'])
+                ? str_replace(['http://', 'https://'], '', $this->action['domain']) : null;
     }
 
     /**

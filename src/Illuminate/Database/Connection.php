@@ -20,7 +20,7 @@ use Illuminate\Database\Query\Grammars\Grammar as QueryGrammar;
 
 class Connection implements ConnectionInterface
 {
-    use DetectsLostConnections;
+    use DetectsDeadlocks, DetectsLostConnections;
 
     /**
      * The active PDO connection.
@@ -338,13 +338,15 @@ class Connection implements ConnectionInterface
 
             $fetchMode = $me->getFetchMode();
             $fetchArgument = $me->getFetchArgument();
+            $fetchConstructorArgument = $me->getFetchConstructorArgument();
 
             if ($fetchMode === PDO::FETCH_CLASS && ! isset($fetchArgument)) {
                 $fetchArgument = 'StdClass';
+                $fetchConstructorArgument = null;
             }
 
             return isset($fetchArgument)
-                ? $statement->fetchAll($fetchMode, $fetchArgument, $me->getFetchConstructorArgument())
+                ? $statement->fetchAll($fetchMode, $fetchArgument, $fetchConstructorArgument)
                 : $statement->fetchAll($fetchMode);
         });
     }
@@ -368,13 +370,15 @@ class Connection implements ConnectionInterface
 
             $fetchMode = $me->getFetchMode();
             $fetchArgument = $me->getFetchArgument();
+            $fetchConstructorArgument = $me->getFetchConstructorArgument();
 
             if ($fetchMode === PDO::FETCH_CLASS && ! isset($fetchArgument)) {
                 $fetchArgument = 'StdClass';
+                $fetchConstructorArgument = null;
             }
 
             if (isset($fetchArgument)) {
-                $statement->setFetchMode($fetchMode, $fetchArgument, $me->getFetchConstructorArgument());
+                $statement->setFetchMode($fetchMode, $fetchArgument, $fetchConstructorArgument);
             } else {
                 $statement->setFetchMode($fetchMode);
             }
@@ -403,7 +407,7 @@ class Connection implements ConnectionInterface
         foreach ($bindings as $key => $value) {
             $statement->bindValue(
                 is_string($key) ? $key : $key + 1, $value,
-                filter_var($value, FILTER_VALIDATE_FLOAT) !== false ? PDO::PARAM_INT : PDO::PARAM_STR
+                is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR
             );
         }
     }
@@ -549,37 +553,44 @@ class Connection implements ConnectionInterface
      * Execute a Closure within a transaction.
      *
      * @param  \Closure  $callback
+     * @param  int  $attempts
      * @return mixed
      *
      * @throws \Exception|\Throwable
      */
-    public function transaction(Closure $callback)
+    public function transaction(Closure $callback, $attempts = 1)
     {
-        $this->beginTransaction();
+        for ($a = 1; $a <= $attempts; $a++) {
+            $this->beginTransaction();
 
-        // We'll simply execute the given callback within a try / catch block
-        // and if we catch any exception we can rollback the transaction
-        // so that none of the changes are persisted to the database.
-        try {
-            $result = $callback($this);
+            // We'll simply execute the given callback within a try / catch block
+            // and if we catch any exception we can rollback the transaction
+            // so that none of the changes are persisted to the database.
+            try {
+                $result = $callback($this);
 
-            $this->commit();
+                $this->commit();
+            }
+
+            // If we catch an exception, we will roll back so nothing gets messed
+            // up in the database. Then we'll re-throw the exception so it can
+            // be handled how the developer sees fit for their applications.
+            catch (Exception $e) {
+                $this->rollBack();
+
+                if ($this->causedByDeadlock($e) && $a < $attempts) {
+                    continue;
+                }
+
+                throw $e;
+            } catch (Throwable $e) {
+                $this->rollBack();
+
+                throw $e;
+            }
+
+            return $result;
         }
-
-        // If we catch an exception, we will roll back so nothing gets messed
-        // up in the database. Then we'll re-throw the exception so it can
-        // be handled how the developer sees fit for their applications.
-        catch (Exception $e) {
-            $this->rollBack();
-
-            throw $e;
-        } catch (Throwable $e) {
-            $this->rollBack();
-
-            throw $e;
-        }
-
-        return $result;
     }
 
     /**

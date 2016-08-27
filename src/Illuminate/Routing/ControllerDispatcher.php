@@ -44,13 +44,13 @@ class ControllerDispatcher
             return $controller->callAction($method, $parameters);
         }
 
-        return $controller->$method(...$parameters);
+        return call_user_func_array([$controller, $method], $parameters);
     }
 
     /**
      * Get the middleware for the controller instance.
      *
-     * @param  \Illuminate\Routing\Controller  $instance
+     * @param  \Illuminate\Routing\Controller  $controller
      * @param  string  $method
      * @return array
      */
@@ -60,9 +60,9 @@ class ControllerDispatcher
             return [];
         }
 
-        return collect($controller->getMiddleware())->reject(function ($options, $name) use ($method) {
-            return static::methodExcludedByOptions($method, $options);
-        })->keys()->all();
+        return collect($controller->getMiddleware())->reject(function ($data) use ($method) {
+            return static::methodExcludedByOptions($method, $data['options']);
+        })->pluck('middleware')->all();
     }
 
     /**
